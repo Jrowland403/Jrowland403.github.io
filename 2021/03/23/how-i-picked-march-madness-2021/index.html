@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Hugo 0.81.0" />
+
+
+<title>How I picked March Madness 2021 - James&#39; Sports Report</title>
+<meta property="og:title" content="How I picked March Madness 2021 - James&#39; Sports Report">
+
+
+  <link href='/favicon.ico' rel='icon' type='image/x-icon'/>
+
+
+
+  
+
+
+
+
+
+
+
+
+<link href='//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+
+
+
+<link rel="stylesheet" href="/css/fonts.css" media="all">
+<link rel="stylesheet" href="/css/main.css" media="all">
+
+
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="header">
+        <nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/images/logo.png"
+         width="50"
+         height="50"
+         alt="Logo">
+  </a>
+
+  <ul class="nav-links">
+    
+    <li><a href="/about/">About</a></li>
+    
+    <li><a href="https://github.com/Jrowland403">GitHub</a></li>
+    
+    <li><a href="https://twitter.com/Rowland_Report">Twitter</a></li>
+    
+  </ul>
+</nav>
+
+      </header>
+
+
+<main class="content" role="main">
+
+  <article class="article">
+    
+    <span class="article-duration">11 min read</span>
+    
+
+    <h1 class="article-title">How I picked March Madness 2021</h1>
+
+    
+    <span class="article-date">2021-03-23</span>
+    
+
+    <div class="article-content">
+      
+<script src="/2021/03/23/how-i-picked-march-madness-2021/index_files/header-attrs/header-attrs.js"></script>
+<script src="/2021/03/23/how-i-picked-march-madness-2021/index_files/kePrint/kePrint.js"></script>
+<link href="/2021/03/23/how-i-picked-march-madness-2021/index_files/lightable/lightable.css" rel="stylesheet" />
+
+
+<p>I feel that I know a lot about College Basketball, but when it comes down to March Madness, I seem to figure out that I have won by the slimmest of margins. Simply put, I am lucky with winning this. I usually look to into detail at teams that are getting hot at the right time. Also I have picked based on coaches in March. With this model, I see that I have chosen very wrong, but let’s see what where It will go. Where I get my wins is in my family bracket pool. I have won four years out of eight. Now this is the time for me to potentially win this for real.</p>
+<p>This season, I thought in my SPMC 491 Class, I could clean the doors off everyone. To break it down, I want to look at the last ten games of the season. What follows is how my bracket has done in this tournament so far.</p>
+<div id="toolkit" class="section level2">
+<h2>Toolkit</h2>
+<p>Using a few libraries that will help me spit out my data to further get this ready. Using, Tidyverse for the code, zoo to help with the random forest and Kable to get some tables that are used later.</p>
+<pre class="r"><code>library(tidyverse)</code></pre>
+<pre><code>## -- Attaching packages --------------------------------------- tidyverse 1.3.0 --</code></pre>
+<pre><code>## v ggplot2 3.3.3     v purrr   0.3.4
+## v tibble  3.0.5     v dplyr   1.0.3
+## v tidyr   1.1.2     v stringr 1.4.0
+## v readr   1.4.0     v forcats 0.5.0</code></pre>
+<pre><code>## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
+## x dplyr::filter() masks stats::filter()
+## x dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>library(tidymodels)</code></pre>
+<pre><code>## -- Attaching packages -------------------------------------- tidymodels 0.1.2 --</code></pre>
+<pre><code>## v broom     0.7.3      v recipes   0.1.15
+## v dials     0.0.9      v rsample   0.0.8 
+## v infer     0.5.4      v tune      0.1.2 
+## v modeldata 0.1.0      v workflows 0.2.1 
+## v parsnip   0.1.5      v yardstick 0.0.7</code></pre>
+<pre><code>## -- Conflicts ----------------------------------------- tidymodels_conflicts() --
+## x scales::discard() masks purrr::discard()
+## x dplyr::filter()   masks stats::filter()
+## x recipes::fixed()  masks stringr::fixed()
+## x dplyr::lag()      masks stats::lag()
+## x yardstick::spec() masks readr::spec()
+## x recipes::step()   masks stats::step()</code></pre>
+<pre class="r"><code>library(zoo)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;zoo&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:base&#39;:
+## 
+##     as.Date, as.Date.numeric</code></pre>
+<pre class="r"><code>library(kableExtra)</code></pre>
+<pre><code>## Warning: package &#39;kableExtra&#39; was built under R version 4.0.4</code></pre>
+<pre><code>## 
+## Attaching package: &#39;kableExtra&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:dplyr&#39;:
+## 
+##     group_rows</code></pre>
+<pre class="r"><code>set.seed(1398)</code></pre>
+</div>
+<div id="feature-data" class="section level2">
+<h2>Feature Data</h2>
+<p>Where I gathered the data was from a scraper that my Professor, Matt Waite grabbed of College basketball games dating back to 2014-2015.
+My logic in choosing these games, is how did each team do in their final 10 games of the regular season. By using a rolling mean in every game, how did that end up showing who was ready for March and who wasn’t. Let’s see the end result.</p>
+<pre class="r"><code>Games &lt;- read_csv(&quot;cbblogs1521.csv&quot;) %&gt;% mutate(
+  Possessions = .5*(TeamFGA - TeamOffRebounds + TeamTurnovers + (.475 * TeamFTA)) + .5*(OpponentFGA - OpponentOffRebounds + OpponentTurnovers + (.475 * OpponentFTA)),
+  OffensiveRating = (TeamScore/Possessions)*100, 
+  DefensiveRating = (OpponentScore/Possessions)*100
+  ) %&gt;%
+  group_by(Team, Season) %&gt;%
+  mutate(
+  Rolling_Mean_Offensive = rollmean(OffensiveRating, k=10, fill=OffensiveRating),
+  Rolling_Mean_Defensive = rollmean(DefensiveRating, k=10, fill=DefensiveRating)
+  ) %&gt;% ungroup() %&gt;% 
+  mutate(
+    Location = case_when(
+    str_trim(HomeAway) == &quot;@&quot; ~ &quot;A&quot;,
+    str_trim(HomeAway) == &quot;N&quot; ~ &quot;N&quot;,
+    TRUE ~ &quot;H&quot;
+  ),
+ Outcome = case_when(
+  grepl(&quot;W&quot;, W_L) ~ &quot;W&quot;, 
+  grepl(&quot;L&quot;, W_L) ~ &quot;L&quot;
+ )
+) %&gt;%
+  mutate(Outcome = as.factor(Outcome))</code></pre>
+<pre><code>## 
+## -- Column specification --------------------------------------------------------
+## cols(
+##   .default = col_double(),
+##   Season = col_character(),
+##   Date = col_date(format = &quot;&quot;),
+##   TeamFull = col_character(),
+##   Opponent = col_character(),
+##   HomeAway = col_character(),
+##   W_L = col_character(),
+##   URL = col_character(),
+##   Conference = col_character(),
+##   Team = col_character()
+## )
+## i Use `spec()` for the full column specifications.</code></pre>
+<p>Then using a simple join, I combined the data sets to get a singular model with the rolling mean.</p>
+<pre class="r"><code>selectedgames &lt;- Games %&gt;% select(Season, Team, Date, Opponent, Outcome, Rolling_Mean_Offensive, Rolling_Mean_Defensive, TeamSRS)</code></pre>
+<pre class="r"><code>opponentgames &lt;- selectedgames %&gt;% select(-Opponent) %&gt;% rename(Opponent = Team, Opponent_Rolling_Offensive = Rolling_Mean_Offensive, Opponent_Rolling_Mean_Defensive = Rolling_Mean_Defensive, OpponentSRS = TeamSRS)</code></pre>
+<pre class="r"><code>Bothsides &lt;- selectedgames %&gt;% left_join(opponentgames, by=c(&quot;Opponent&quot;, &quot;Date&quot;, &quot;Season&quot;)) %&gt;% na.omit() %&gt;% select(-Outcome.y) %&gt;% rename(Outcome = Outcome.x)</code></pre>
+</div>
+<div id="using-the-tidymodels" class="section level2">
+<h2>Using the Tidymodels</h2>
+<p>So with that I wanted to start the training process of my data. With that I need to make a training and a testing split.</p>
+<pre class="r"><code>Log_split &lt;- initial_split(Bothsides, prop = .8)
+Log_train &lt;- training(Log_split)
+Log_test &lt;- testing(Log_split)</code></pre>
+<p>I then grabbed a recipe and named my predictors accordingly.</p>
+<pre class="r"><code>Log_recipe &lt;- 
+  recipe(Outcome ~ ., data = Log_train) %&gt;% 
+  update_role(Team, Opponent, Date, Season, new_role = &quot;ID&quot;) %&gt;% 
+  step_normalize(all_predictors())
+
+summary(Log_recipe)</code></pre>
+<pre><code>## # A tibble: 11 x 4
+##    variable                        type    role      source  
+##    &lt;chr&gt;                           &lt;chr&gt;   &lt;chr&gt;     &lt;chr&gt;   
+##  1 Season                          nominal ID        original
+##  2 Team                            nominal ID        original
+##  3 Date                            date    ID        original
+##  4 Opponent                        nominal ID        original
+##  5 Rolling_Mean_Offensive          numeric predictor original
+##  6 Rolling_Mean_Defensive          numeric predictor original
+##  7 TeamSRS                         numeric predictor original
+##  8 Opponent_Rolling_Offensive      numeric predictor original
+##  9 Opponent_Rolling_Mean_Defensive numeric predictor original
+## 10 OpponentSRS                     numeric predictor original
+## 11 Outcome                         nominal outcome   original</code></pre>
+<p>Then I needed to define the model to gather my parameters to see where it runs from.</p>
+<pre class="r"><code>Log_mod &lt;- 
+  rand_forest() %&gt;% 
+  set_engine(&quot;ranger&quot;) %&gt;%
+  set_mode(&quot;classification&quot;)</code></pre>
+<p>Now just a simple workflow addition to the already added Log_mod and we are all set from there.</p>
+<pre class="r"><code>Log_workflow &lt;- 
+  workflow() %&gt;% 
+  add_model(Log_mod) %&gt;% 
+  add_recipe(Log_recipe)</code></pre>
+<p>Now here is where the data really takes a “turn” literally. My fan on my computer runs on high for about 5 minutes or so.</p>
+<pre class="r"><code>Log_fit &lt;- 
+  Log_workflow %&gt;% 
+  fit(data = Log_train)</code></pre>
+<p>So now I want to set up my curve for this data and see it’s end result.</p>
+</div>
+<div id="evaluating-my-results" class="section level2">
+<h2>Evaluating My Results</h2>
+<pre class="r"><code>Trainpredict &lt;- Log_fit %&gt;% predict(new_data = Log_train) %&gt;%
+  bind_cols(Log_train)
+
+Trainpredict</code></pre>
+<pre><code>## # A tibble: 38,653 x 12
+##    .pred_class Season Team  Date       Opponent Outcome Rolling_Mean_Of~
+##    &lt;fct&gt;       &lt;chr&gt;  &lt;chr&gt; &lt;date&gt;     &lt;chr&gt;    &lt;fct&gt;              &lt;dbl&gt;
+##  1 L           2014-~ Abil~ 2014-11-19 Tulsa    L                  127. 
+##  2 L           2014-~ Abil~ 2014-11-22 Duquesne L                  127. 
+##  3 L           2014-~ Abil~ 2014-12-06 Houston  L                   92.5
+##  4 L           2014-~ Abil~ 2014-12-17 Loyola ~ L                   93.7
+##  5 W           2014-~ Abil~ 2014-12-22 South C~ W                   97.9
+##  6 W           2014-~ Abil~ 2014-12-23 Arkansa~ W                   98.6
+##  7 L           2014-~ Abil~ 2014-12-28 Grand C~ L                   96.4
+##  8 W           2014-~ Abil~ 2015-01-04 Central~ W                   98.9
+##  9 W           2014-~ Abil~ 2015-01-10 Nicholl~ W                  103. 
+## 10 W           2014-~ Abil~ 2015-01-13 Northwe~ W                  104. 
+## # ... with 38,643 more rows, and 5 more variables:
+## #   Rolling_Mean_Defensive &lt;dbl&gt;, TeamSRS &lt;dbl&gt;,
+## #   Opponent_Rolling_Offensive &lt;dbl&gt;, Opponent_Rolling_Mean_Defensive &lt;dbl&gt;,
+## #   OpponentSRS &lt;dbl&gt;</code></pre>
+<pre class="r"><code>Trainpredict &lt;- Log_fit %&gt;% predict(new_data = Log_train, type=&quot;prob&quot;) %&gt;%
+  bind_cols(Trainpredict)
+
+Trainpredict</code></pre>
+<pre><code>## # A tibble: 38,653 x 14
+##    .pred_L .pred_W .pred_class Season Team  Date       Opponent Outcome
+##      &lt;dbl&gt;   &lt;dbl&gt; &lt;fct&gt;       &lt;chr&gt;  &lt;chr&gt; &lt;date&gt;     &lt;chr&gt;    &lt;fct&gt;  
+##  1  0.949   0.0512 L           2014-~ Abil~ 2014-11-19 Tulsa    L      
+##  2  0.874   0.126  L           2014-~ Abil~ 2014-11-22 Duquesne L      
+##  3  0.912   0.0883 L           2014-~ Abil~ 2014-12-06 Houston  L      
+##  4  0.987   0.0127 L           2014-~ Abil~ 2014-12-17 Loyola ~ L      
+##  5  0.110   0.890  W           2014-~ Abil~ 2014-12-22 South C~ W      
+##  6  0.237   0.763  W           2014-~ Abil~ 2014-12-23 Arkansa~ W      
+##  7  0.884   0.116  L           2014-~ Abil~ 2014-12-28 Grand C~ L      
+##  8  0.0620  0.938  W           2014-~ Abil~ 2015-01-04 Central~ W      
+##  9  0.232   0.768  W           2014-~ Abil~ 2015-01-10 Nicholl~ W      
+## 10  0.467   0.533  W           2014-~ Abil~ 2015-01-13 Northwe~ W      
+## # ... with 38,643 more rows, and 6 more variables:
+## #   Rolling_Mean_Offensive &lt;dbl&gt;, Rolling_Mean_Defensive &lt;dbl&gt;, TeamSRS &lt;dbl&gt;,
+## #   Opponent_Rolling_Offensive &lt;dbl&gt;, Opponent_Rolling_Mean_Defensive &lt;dbl&gt;,
+## #   OpponentSRS &lt;dbl&gt;</code></pre>
+<pre class="r"><code>metrics(Trainpredict, Outcome, .pred_class)</code></pre>
+<pre><code>## # A tibble: 2 x 3
+##   .metric  .estimator .estimate
+##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
+## 1 accuracy binary         0.978
+## 2 kap      binary         0.956</code></pre>
+<pre class="r"><code>Trainpredict %&gt;%
+  conf_mat(Outcome, .pred_class)</code></pre>
+<pre><code>##           Truth
+## Prediction     L     W
+##          L 18833   411
+##          W   432 18977</code></pre>
+<pre class="r"><code>roc_auc(Trainpredict, truth = Outcome, .pred_W)</code></pre>
+<pre><code>## # A tibble: 1 x 3
+##   .metric .estimator .estimate
+##   &lt;chr&gt;   &lt;chr&gt;          &lt;dbl&gt;
+## 1 roc_auc binary       0.00163</code></pre>
+<pre class="r"><code>roc_auc(Trainpredict, truth = Outcome, .pred_L)</code></pre>
+<pre><code>## # A tibble: 1 x 3
+##   .metric .estimator .estimate
+##   &lt;chr&gt;   &lt;chr&gt;          &lt;dbl&gt;
+## 1 roc_auc binary         0.998</code></pre>
+<pre class="r"><code>Testpredict &lt;- Log_fit %&gt;% predict(new_data = Log_test) %&gt;%
+  bind_cols(Log_test)
+
+Testpredict</code></pre>
+<pre><code>## # A tibble: 9,663 x 12
+##    .pred_class Season Team  Date       Opponent Outcome Rolling_Mean_Of~
+##    &lt;fct&gt;       &lt;chr&gt;  &lt;chr&gt; &lt;date&gt;     &lt;chr&gt;    &lt;fct&gt;              &lt;dbl&gt;
+##  1 L           2014-~ Abil~ 2014-11-29 UC-Rive~ L                   91.8
+##  2 L           2014-~ Abil~ 2014-12-04 Sacrame~ W                   88.3
+##  3 L           2014-~ Abil~ 2015-01-31 Lamar    L                   90.6
+##  4 L           2014-~ Air ~ 2014-11-14 Army     L                  107. 
+##  5 W           2014-~ Air ~ 2015-01-07 San Jos~ W                  102. 
+##  6 L           2014-~ Air ~ 2015-01-14 New Mex~ L                  102. 
+##  7 W           2014-~ Air ~ 2015-01-28 San Jos~ W                  101. 
+##  8 W           2014-~ Akron 2014-12-13 Middle ~ L                  106. 
+##  9 W           2014-~ Akron 2014-12-30 Marshall W                  105. 
+## 10 W           2014-~ Akron 2015-01-27 Ball St~ W                  102. 
+## # ... with 9,653 more rows, and 5 more variables: Rolling_Mean_Defensive &lt;dbl&gt;,
+## #   TeamSRS &lt;dbl&gt;, Opponent_Rolling_Offensive &lt;dbl&gt;,
+## #   Opponent_Rolling_Mean_Defensive &lt;dbl&gt;, OpponentSRS &lt;dbl&gt;</code></pre>
+<pre class="r"><code>Testpredict &lt;- Log_fit %&gt;% predict(new_data = Log_test, type=&quot;prob&quot;) %&gt;%
+  bind_cols(Testpredict)
+
+Testpredict</code></pre>
+<pre><code>## # A tibble: 9,663 x 14
+##    .pred_L .pred_W .pred_class Season Team  Date       Opponent Outcome
+##      &lt;dbl&gt;   &lt;dbl&gt; &lt;fct&gt;       &lt;chr&gt;  &lt;chr&gt; &lt;date&gt;     &lt;chr&gt;    &lt;fct&gt;  
+##  1  0.847   0.153  L           2014-~ Abil~ 2014-11-29 UC-Rive~ L      
+##  2  0.945   0.0546 L           2014-~ Abil~ 2014-12-04 Sacrame~ W      
+##  3  0.843   0.157  L           2014-~ Abil~ 2015-01-31 Lamar    L      
+##  4  0.558   0.442  L           2014-~ Air ~ 2014-11-14 Army     L      
+##  5  0.0692  0.931  W           2014-~ Air ~ 2015-01-07 San Jos~ W      
+##  6  0.799   0.201  L           2014-~ Air ~ 2015-01-14 New Mex~ L      
+##  7  0.0640  0.936  W           2014-~ Air ~ 2015-01-28 San Jos~ W      
+##  8  0.212   0.788  W           2014-~ Akron 2014-12-13 Middle ~ L      
+##  9  0.0284  0.972  W           2014-~ Akron 2014-12-30 Marshall W      
+## 10  0.187   0.813  W           2014-~ Akron 2015-01-27 Ball St~ W      
+## # ... with 9,653 more rows, and 6 more variables: Rolling_Mean_Offensive &lt;dbl&gt;,
+## #   Rolling_Mean_Defensive &lt;dbl&gt;, TeamSRS &lt;dbl&gt;,
+## #   Opponent_Rolling_Offensive &lt;dbl&gt;, Opponent_Rolling_Mean_Defensive &lt;dbl&gt;,
+## #   OpponentSRS &lt;dbl&gt;</code></pre>
+<pre class="r"><code>metrics(Testpredict, Outcome, .pred_class)</code></pre>
+<pre><code>## # A tibble: 2 x 3
+##   .metric  .estimator .estimate
+##   &lt;chr&gt;    &lt;chr&gt;          &lt;dbl&gt;
+## 1 accuracy binary         0.725
+## 2 kap      binary         0.451</code></pre>
+<p>So from that Let’s determine a quick test run and see how the Play In Games went for me with this data set.</p>
+</div>
+<div id="play-in-games" class="section level2">
+<h2>Play in Games</h2>
+<p>Some people say these games don’t matter, but here’s why they do matter. I want to see this play out for every game but that would be a thirty minute read, so let’s look at the play in games. To do so, I made a tibble of each game slated that day and began my coding. Here is what I came up with.</p>
+<pre class="r"><code>playin &lt;- tibble(
+  Team=&quot;Norfolk State&quot;,
+  Opponent=&quot;Appalachian State&quot;,
+  Date = as.Date(&quot;2021-03-19&quot;)
+) %&gt;% add_row(
+  Team=&quot;Wichita State&quot;,
+  Opponent=&quot;Drake&quot;,
+  Date = as.Date(&quot;2021-03-19&quot;)
+) %&gt;% add_row(
+  Team=&quot;Mount St. Mary&#39;s&quot;,
+  Opponent=&quot;Texas Southern&quot;,
+  Date = as.Date(&quot;2021-03-19&quot;)
+) %&gt;% add_row(
+  Team=&quot;Michigan State&quot;,
+  Opponent=&quot;UCLA&quot;,
+  Date = as.Date(&quot;2021-03-19&quot;)
+)</code></pre>
+<pre class="r"><code>playingames &lt;- selectedgames %&gt;% group_by(Team) %&gt;% filter(Date == max(Date), Season == &quot;2020-2021&quot;) %&gt;% select(-Date, -Opponent, -Outcome) %&gt;% right_join(playin)</code></pre>
+<pre><code>## Joining, by = &quot;Team&quot;</code></pre>
+<pre class="r"><code>playingames &lt;- opponentgames %&gt;% group_by(Opponent) %&gt;% filter(Date == max(Date)) %&gt;% ungroup()  %&gt;% select(-Season, -Date, -Outcome) %&gt;% right_join(playingames, by=c(&quot;Opponent&quot;)) %&gt;% select(Team, everything())</code></pre>
+<pre class="r"><code>playinround &lt;- Log_fit %&gt;% predict(new_data = playingames) %&gt;%
+  bind_cols(playingames) 
+
+Log_fit %&gt;% predict(new_data = playinround, type=&quot;prob&quot;) %&gt;%
+  bind_cols(playinround)</code></pre>
+<pre><code>## # A tibble: 4 x 13
+##   .pred_L .pred_W .pred_class Team  Opponent Opponent_Rollin~ Opponent_Rollin~
+##     &lt;dbl&gt;   &lt;dbl&gt; &lt;fct&gt;       &lt;chr&gt; &lt;chr&gt;               &lt;dbl&gt;            &lt;dbl&gt;
+## 1   0.517   0.483 L           Norf~ Appalac~             96.0             98.5
+## 2   0.456   0.544 W           Wich~ Drake               117.              88.6
+## 3   0.568   0.432 L           Moun~ Texas S~            108.             105. 
+## 4   0.553   0.447 L           Mich~ UCLA                110.              73.4
+## # ... with 6 more variables: OpponentSRS &lt;dbl&gt;, Season &lt;chr&gt;,
+## #   Rolling_Mean_Offensive &lt;dbl&gt;, Rolling_Mean_Defensive &lt;dbl&gt;, TeamSRS &lt;dbl&gt;,
+## #   Date &lt;date&gt;</code></pre>
+<pre class="r"><code>playinround %&gt;% select(Team, .pred_class, Opponent,) %&gt;% kable() %&gt;% kable_styling(bootstrap_options = c(&quot;striped&quot;, &quot;condensed&quot;))</code></pre>
+<table class="table table-striped table-condensed" style="margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:left;">
+Team
+</th>
+<th style="text-align:left;">
+.pred_class
+</th>
+<th style="text-align:left;">
+Opponent
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+Norfolk State
+</td>
+<td style="text-align:left;">
+L
+</td>
+<td style="text-align:left;">
+Appalachian State
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Wichita State
+</td>
+<td style="text-align:left;">
+W
+</td>
+<td style="text-align:left;">
+Drake
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Mount St. Mary’s
+</td>
+<td style="text-align:left;">
+L
+</td>
+<td style="text-align:left;">
+Texas Southern
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Michigan State
+</td>
+<td style="text-align:left;">
+L
+</td>
+<td style="text-align:left;">
+UCLA
+</td>
+</tr>
+</tbody>
+</table>
+<p>Since these games have long since happened, my model got 2 of 4 correct. But I’m not trying to bore how I have done with this bracket so far, but so far, not looking great.</p>
+</div>
+<div id="hows-it-looking" class="section level2">
+<h2>How’s it Looking?</h2>
+<p>Actually not bad, though losing a champion on the third day hasn’t set me back that far. I made a full 25 brackets this year. In ESPN’s Tournament Challenge, I own a bracket currently sitting at 3,198 out of 14.7 million. This bracket however is way behind that at 366,631. With another bracket that has Gonzaga winning it all at 95,234 so I feel that I have beaten a machine at this coding thing, but I’m getting most picks wrong.</p>
+<p>I have four elite eight teams and two final four teams now remaining but need a clutch save if I am to win this.</p>
+<div class="figure">
+<img src="images/West%20and%20South.png" alt="" />
+<p class="caption">My West and South</p>
+</div>
+<div class="figure">
+<img src="images/East%20and%20Midwest.png" alt="" />
+<p class="caption">My East and Midwest</p>
+</div>
+</div>
+
+    </div>
+  </article>
+
+  
+
+
+</main>
+
+      <footer class="footer">
+        <ul class="footer-links">
+          <li>
+            <a href="/index.xml" type="application/rss+xml" target="_blank">RSS feed</a>
+          </li>
+          <li>
+            <a href="https://gohugo.io/" class="footer-links-kudos">Made with <img src="/images/hugo-logo.png" alt="Img link to Hugo website" width="22" height="22"></a>
+          </li>
+        </ul>
+      </footer>
+
+    </div>
+    
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/r.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js"></script>
+<script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+
+
+
+    
+
+    
+  </body>
+</html>
+
