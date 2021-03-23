@@ -1,0 +1,43 @@
+So now it's time to see how I can do here when it comes to March Madness Brackets. Let's add the libraries we need for all of this madness
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(zoo)
+library(kableExtra)
+```
+
+From that I need my data of the whole thing. I will be using the same testers as I used to make my BIG-10 data set.
+
+```{r}
+Games <- read_csv("cbblogs1521.csv") %>% mutate(
+  Possessions = .5*(TeamFGA - TeamOffRebounds + TeamTurnovers + (.475 * TeamFTA)) + .5*(OpponentFGA - OpponentOffRebounds + OpponentTurnovers + (.475 * OpponentFTA)),
+  OffensiveRating = (TeamScore/Possessions)*100, 
+  DefensiveRating = (OpponentScore/Possessions)*100
+  ) %>%
+  group_by(Team, Season) %>%
+  mutate(
+  Rolling_Mean_Offensive = rollmean(OffensiveRating, k=10, fill=OffensiveRating),
+  Rolling_Mean_Defensive = rollmean(DefensiveRating, k=10, fill=DefensiveRating)
+  ) %>% filter(between(Game, max(Game)-10, max(Game))) %>% ungroup() %>% 
+  mutate(
+    Location = case_when(
+    str_trim(HomeAway) == "@" ~ "A",
+    str_trim(HomeAway) == "N" ~ "N",
+    TRUE ~ "H"
+  ),
+ Outcome = case_when(
+  grepl("W", W_L) ~ "W", 
+  grepl("L", W_L) ~ "L"
+ )
+) %>%
+  mutate(Outcome = as.factor(Outcome))
+```
+
+
+
+
+
+
+
+
